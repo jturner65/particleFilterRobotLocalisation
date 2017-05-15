@@ -10,8 +10,6 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 	public myLocalizer lcl;
 	public final float invSqrt2Pi;
 	public myLogData log;
-
-	//public final float zMax;						//180 scans for each measurement, max range in centimeters
 	
 	public float sigHit;						//set as .1 raycast dist?
 	public myMap m;	
@@ -20,7 +18,6 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 	public myWeightedSampler(Lab1Localization _p, myLocalizer _l, myLogData _log, myMap _m, mySample[] _XbarAra, int _dataPointIdx, int _stIdx, int _numSamps) {
 		p=_p; log=_log; m=_m; lcl = _l;
 		this.invSqrt2Pi = Lab1Localization.invSqrt2Pi;
-		//zMax = log.maxLRFRange;
 		dataPointIdx = _dataPointIdx;	//index in datapoint array for sequence of odo/LRF readings - NOTE : all data points now have range finder readings too (odo has most recent)
 		stIdx = _stIdx;					//start index in proposal dist array
 		numSamps = _numSamps;			//# of samples to get from prop array to calculate in this thread
@@ -105,17 +102,17 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 	 * sample motion model for odometry data - same config as motion model for vectors
 	 * @param ut  pair of poses from odo data : idx0 == xbar_t_1=(xbar,ybar,thetbar), idx1 == xbar_t=(xbartick,ybartick,thetbartick)
 	 * @param xt_1 initial pose 
-	 * @return gives a random xt state based on distribution described by ut and xt_1
+	 * @return gives a random xt state based on odo distribution described by ut and xt_1
 	 */
 	//NOTE :X AND Y ARE OFF BETWEEN SAMPLE AND BOT DATA
 	public mySample odoSampleMoModelWithoutMap( myPoint[] ut, mySample xt_1){
-		float negMult = -1.0f;
+		//float negMult = -1.0f;
 		float diffYbar = ut[1].y-ut[0].y, 
 				diffXbar = ut[1].x-ut[0].x, 
-				diffThetBar = negMult*(ut[1].z-ut[0].z),
-//				delRot1 = PApplet.atan2(diffYbar, diffXbar)-(negMult*ut[0].z),
-//				diffThetBar = (ut[1].z-ut[0].z),
+				diffThetBar = ut[1].z-ut[0].z,
 				delRot1 = PApplet.atan2(diffYbar, diffXbar)-(ut[0].z),
+//				diffThetBar = negMult*(ut[1].z-ut[0].z),
+//				delRot1 = PApplet.atan2(diffYbar, diffXbar)-(negMult*ut[0].z),
 				delTransSq = (diffXbar*diffXbar)+(diffYbar*diffYbar)				
 				;	
 		
@@ -125,10 +122,10 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 //		myVector delHat = new myVector(del.x - sampleData(myLocalizer.alpha1*(dRot1Sq)+myLocalizer.alpha2*(delTransSq)), 	//delHatRot1 = delRot1 - sample(alpha1*delrot1*delrot1 + alpha2*deltrans*delTrans
 //				del.y - sampleData(myLocalizer.alpha3*(delTransSq)+myLocalizer.alpha4*(dRot1Sq)+myLocalizer.alpha4*(dRot2Sq)), //delhattrans
 //				del.z - sampleData(myLocalizer.alpha1*(dRot2Sq)+myLocalizer.alpha2*(delTransSq)));							//delhatrot2
-//
-		myVector delHat = new myVector(del.x - sampleData(myLocalizer.alpha1*(del.x)+myLocalizer.alpha2*(del.y)), 	//delHatRot1 = delRot1 - sample(alpha1*delrot1*delrot1 + alpha2*deltrans*delTrans
+		float alphaDelTrans = myLocalizer.alpha2*(del.y);
+		myVector delHat = new myVector(del.x - sampleData(myLocalizer.alpha1*(del.x)+alphaDelTrans), 	//delHatRot1 = delRot1 - sample(alpha1*delrot1*delrot1 + alpha2*deltrans*delTrans
 				del.y - sampleData(myLocalizer.alpha3*(del.y)+myLocalizer.alpha4*(del.x + del.z)), //delhattrans
-				del.z - sampleData(myLocalizer.alpha1*(del.z)+myLocalizer.alpha2*(del.y)));							//delhatrot2
+				del.z - sampleData(myLocalizer.alpha1*(del.z)+alphaDelTrans));							//delhatrot2
 
 		mySample pv = new mySample(p,m,new myVector(xt_1.d.x + (float)(delHat.y* Math.cos(xt_1.d.z + delHat.x)),								//xtick
 													xt_1.d.y + (float)(delHat.y* Math.sin(xt_1.d.z + delHat.x)),															//ytick
@@ -151,9 +148,9 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 			int col = (int)(pv.d.x), row = (int)(pv.d.y);
 			pv.w = ((col<0) || (col>m.mapWidth) || (row<0) || (row>m.mapHeight)) ? 0 : m.occupancyMap[row][col];		//col and row
 			iters++;
-			if(iters >= 20){
-				System.out.print("\ttoo long :"+iters+"|@ x=col:"+col+" y=row:"+row);
-			}
+//			if(iters >= 20){
+//				System.out.println("\ttoo long :"+iters+"|@ x=col:"+col+" y=row:"+row);
+//			}
 		} while ((pv.w <=0) && (iters < 20));
 		if(pv.w != 0 ){ pv.setLRFCastsAtOrient();}
 		return pv;
@@ -166,7 +163,7 @@ public class myWeightedSampler implements Callable<Boolean> {//extends Thread {
 		for(int i =stIdx; i<endIdx; ++i){
 			//call motion model for each sample
 			tmp = odoSampleMoModelWithMap(log.dataPairs[dataPointIdx],lcl.X[i]);
-			if(tmp.w<=0){
+			if(tmp.w<0){
 				XbarAra[i] = null;				
 			} else {
 				XbarAra[i] = tmp;			

@@ -1,29 +1,29 @@
 package cs8803Lab1;
 
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
 import processing.core.PApplet;
-import processing.core.PConstants;
 
 //class holding particle filter code
 public class myLocalizer {
 	public Lab1Localization p;
-	public final int numSamples = 100;
+	public final int numSamples = 1000;
+	private final int numSampsPerFrame = numSamples/10;
 	public myLogData dataLog;
 
 	public myMap m;
 
 	public final float  invZMax;
-	public static float zhit = .6f,
-	zshort=.35f,
-	zmax=.0025f,
-	zrand=.1975f,
-	//sig_hit=50,			//set instead to be val * raycast dist?
-	lamshort=.0028f;	
+	public static float 
+		zhit = .6f,
+		zshort=.35f,
+		zmax=.0025f,
+		zrand=.1975f,
+		//sig_hit=50,			//set instead to be val * raycast dist?
+		lamshort=.0028f;	
 	
 	public static float sigScale = .08f;			//scaling factor for sigma hit
 	public static float measAlpha = 1f;		
@@ -53,7 +53,7 @@ public class myLocalizer {
 	public myLocalizer(Lab1Localization _p, myLogData _dl, myMap _m) {
 		p = _p;
 		dataLog = _dl;
-		zMax = dataLog.maxLRFRange/10.0f;
+		zMax = dataLog.maxLRCells;	
 		invZMax = 1.0f/zMax;
 		m = _m;
 		initProposal(); // initialize particles
@@ -62,9 +62,7 @@ public class myLocalizer {
 		p.outStr2Scr("Test measurement model");
 		testBRF();
 		testMoMdl();
-		p.outStr2Scr("Test measurement model done");
-		
-		
+		p.outStr2Scr("Test measurement model done");		
 	}
 
 	// initialize proposal/prior distribution off of base map occupancy probs
@@ -86,27 +84,25 @@ public class myLocalizer {
 	
 	//set sample ray casts for initial samples
 	public void setInitSampleOrientation(){
-		Tuple<Integer,Integer> key;
+		//Tuple<Integer,Integer> key;
 		for (int i = 0; i < X.length; ++i) {
 			X[i].setLRFCastsAtOrient();		
 		}		
 	}
 	int count = 0;
 		// solve localization for particular index in data log array
-	public void MCL(int dataPtidx) {
-		
+	public void MCL(int dataPtidx) {		
 		this.maxSampW_y = -1;
 		callSampCalcs.clear();
 		//callSampFutures.clear();
 		mySample tmp;
 		float[] tmpprob = new float[2];
 		float totWeight = 0, totNormLogWt = 0;
-		int sampleFrameSize = p.max(X.length/50, 10);
 		mySample[] XbarAra = new mySample[X.length];
-		for (int i = 0; i < X.length; i += sampleFrameSize) {
-			int finalLen = (i + sampleFrameSize <= X.length ? sampleFrameSize: X.length % sampleFrameSize);
+		for (int i = 0; i < X.length; i += numSampsPerFrame) {
+		//	int finalLen = (i + sampleFrameSize <= X.length ? numSampsPerFrame : finalFrameLen);
 			// p.outStr2Scr("i :" + i + " final len "+finalLen +" x length "+X.length);			
-			callSampCalcs.add(new myWeightedSampler(p, this, dataLog, m, XbarAra, dataPtidx, i, finalLen));
+			callSampCalcs.add(new myWeightedSampler(p, this, dataLog, m, XbarAra, dataPtidx, i, numSampsPerFrame));
 		} // sample and eval each sample
 		try {callSampFutures = p.th_exec.invokeAll(callSampCalcs);for(Future<Boolean> f: callSampFutures) { f.get(); }} catch (Exception e) { e.printStackTrace(); }		
 		proposal = new ConcurrentSkipListMap<Float, mySample>();
@@ -124,7 +120,7 @@ public class myLocalizer {
 				//continue;
 			}
 			if(XbarAra[i].w <= 0){
-				p.outStr2Scr("wt 0  xbarAra @ i ="+i+  " count :"+count);		//should never happen
+				p.outStr2Scr("wt " + XbarAra[i].w + "  xbarAra @ i = "+i+  " count :"+count);		//should never happen
 				continue;
 			}
 			X_bar.put(totWeight, XbarAra[i]);	
@@ -387,7 +383,7 @@ public class myLocalizer {
 		p.popStyle();	p.popMatrix();
 		p.pushMatrix();	p.pushStyle();
 		m.translateBotToDemoMapCtr();
-		dataLog.data[botIdx].drawBotDataLoc(); // draw sim showing bot moving
+		dataLog.data[botIdx].drawBotDataLoc(); // draw sim of odo/lf data showing bot moving
 		p.popStyle();p.popMatrix();
 	}//draw
 

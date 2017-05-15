@@ -14,7 +14,7 @@ public class myLogData {
 	
 	public final int numRngRdg = 180;								//# of range readings per laser sweep
 
-	public float maxLRFRange;
+	public float maxLRCells;
 	public int numDataPts,
 				numODOPts,
 				numLRFPts;
@@ -52,8 +52,8 @@ public class myLogData {
 		//int lidx = 0,oidx=0;
 		botColor = p.color((int)(Math.random()*155),(int)(Math.random()*155),(int)(Math.random()*155));	
 		
-		maxLRFRange = getMaxLRFDist();
-		invZMax = 1.0f/maxLRFRange;
+		maxLRCells = getMaxLRFDist();
+		invZMax = 1.0f/maxLRCells;
 		araCntDists  = new int[830];		//enough room for longest distance in all data files
 		buildLRFDistMap();
 	}
@@ -83,7 +83,14 @@ public class myLogData {
 		String[] fileData = p.loadStrings(logName);
 		myDataPoint[] tmpAra = new myDataPoint[fileData.length];
 		int obsIdx = 0;
-		for(String line : fileData){if(line.toUpperCase().charAt(0)=='L'){	tmpAra[obsIdx] = readLaserObs(line);numLRFPts++;} else {	tmpAra[obsIdx] = readOdoObs(line);numODOPts++;}obsIdx++;}	
+		for(String line : fileData){
+			char obsType = line.toUpperCase().charAt(0);
+			switch (obsType){
+				case 'L' : {tmpAra[obsIdx++] = readLaserObs(line);numLRFPts++; break;}
+				case 'O' : {tmpAra[obsIdx++] = readOdoObs(line);numODOPts++; break;}
+				default :	{p.outStr2Scr("myLogData::loadObsData : Unrecognized observation type in log :"+obsType); break;}
+			}
+		}//if(line.toUpperCase().charAt(0)=='L'){	tmpAra[obsIdx] = readLaserObs(line);numLRFPts++;} else {	tmpAra[obsIdx] = readOdoObs(line);numODOPts++;}obsIdx++;}	
 		return tmpAra;		
 	}//loadObsData
 	
@@ -95,13 +102,14 @@ public class myLogData {
 	public myDataPoint readLaserObs( String line){
 		String[] prsStr = line.split("\\s+");
 		float[] readings = new float[numRngRdg];
-		float[] rngDiv10 = new float[numRngRdg];
+		float[] rngDiv10 = new float[numRngRdg]; //these denote squares distance from center of bot
 		//for(int i=0;i<numRngRdg;++i){	readings[i]=Integer.parseInt(prsStr[i+7]) + laserOffset;rngDiv10[i]=readings[i]/10.0f;}	//can't just add laser offset, need to add 	
+		//build offset into reading
 		for(int i=0;i<numRngRdg;++i){	
 			readings[i] =Float.parseFloat(prsStr[i+7]);
-			//need to modify reading based on angle - subtract full amount from numRngRdg/2
+			//need to modify reading based on angle - reading is further since lrf is 25 cm in front of bot
 			float angle = (90+i)*PConstants.DEG_TO_RAD;
-			float tmpVal = (float)(Math.sqrt(readings[i]*readings[i] + 625 - (50*readings[i] * Math.cos(angle))));//law of cosines
+			float tmpVal = (float)(Math.sqrt(readings[i]*readings[i] + 625 - (50*readings[i] * Math.cos(angle))));//law of cosines - offset readings by 25 cm fwd77
 			rngDiv10[i]=tmpVal/10.0f;
 		}		
 		return new myDataPoint(p, new float[]{Float.parseFloat(prsStr[1]), Float.parseFloat(prsStr[2]),Float.parseFloat(prsStr[3])}, LASERReading,new float[]{Float.parseFloat(prsStr[4]),Float.parseFloat(prsStr[5]),Float.parseFloat(prsStr[6])},readings, rngDiv10,Float.parseFloat(prsStr[prsStr.length-1]));	
@@ -154,7 +162,7 @@ public class myLogData {
 	
 
 	//returns max range reading from laser range finder for this log
-	public float getMaxLRFDist(){float res = 0;for(int j=0;j<data.length;++j){	res=PApplet.max(res, data[j].getMaxLRFRange());}return res;}	
+	public float getMaxLRFDist(){float res = 0;for(int j=0;j<data.length;++j){	res=PApplet.max(res, data[j].getMaxLRFCells());}return res;}	
 	//return array of strings to display on screen instead of in console
 	public String[] getInfoStrAra(){
 		ArrayList<String> res = new ArrayList<String>();
@@ -163,7 +171,7 @@ public class myLogData {
 	}
 	
 	public String toString(){
-		String res = "Data Log : "+name+" # data pts " + data.length + " # ODO pts : "+this.numODOPts + " # LRF pts : " + this.numLRFPts+" Max LRF Val : " + maxLRFRange + "\n";
+		String res = "Data Log : "+name+" # data pts " + data.length + " # ODO pts : "+this.numODOPts + " # LRF pts : " + this.numLRFPts+" Max LR Dist from bot ctr, in cells : " + maxLRCells + "\n";
 		//res+="Data pts : \n";
 		//for(int i =0;i<data.length;++i){res+=data[i];}		
 		return res;		

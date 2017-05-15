@@ -18,12 +18,14 @@ public class myDataPoint {
 	//public float thetaSamp, lThetaSamp;						//theta and laser theta in sample frame , where 0 is positive x, and sweep is ccw
 	public final int type;											//0 == odometry, 1 == laser
 	private final float[] lreadingsRaw;									//laser range finder readings - offset from center of robot by 25 cm - adjusted as read from file.
-	public final float[] lrngCells;									//laser range finder readings in grid space - div 10. - locations can be floats	
+	public final float[] lrngCells;									//laser range finder readings in grid/pixel space - orig val div 10. - locations can be floats	
 	//set every odo cell with the most recent range finder data in cell space - initialize this data to all 0's in case we start with odo data and not lrf data
 	public static float[] mostRecentLRngCells = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	public static float[] mostRecentLRFRaw = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	public int clr;
+	//max length of observations
 	public float maxLen;
-	
+	public static float mostRecentMaxLen = 0;
 	/**
 	 * range readings of laser in cm.  The 180 readings span
 		180 degrees *STARTING FROM THE RIGHT AND GOING LEFT*  Just like angles,
@@ -38,21 +40,24 @@ public class myDataPoint {
 		thetaOdo = _pos[2];					//rotation data is backwards from my orientation
 		odoCells = new myPoint(odoCoordsRaw.x/10.0f,odoCoordsRaw.y/10.0f,thetaOdo);
 		type = _type;
-		maxLen = 0;
-		if(type==1){
+		if(type==1){//laser range finder
 			lreadingsRaw=new float[_lr.length];
 			lrngCells = new float[_lr.length];
 			System.arraycopy(_lr, 0, lreadingsRaw, 0, _lr.length);
 			System.arraycopy(_lrg10, 0, lrngCells, 0, _lrg10.length);
 			maxLen = PApplet.max(lrngCells);
+			mostRecentMaxLen = maxLen;
+			System.arraycopy(_lr, 0, mostRecentLRFRaw,0,_lr.length);
 			System.arraycopy(_lrg10, 0, mostRecentLRngCells,0,_lrg10.length);
 			lOdoCoordsRaw = new myPoint(_lsrPos[0],_lsrPos[1], _lsrPos[2]);
 			lThetaOdo = _lsrPos[2];
 			lOdoCells = new myPoint(_lsrPos[0]/10.0f,_lsrPos[1]/10.0f,lThetaOdo);
-		} else {
+		} else {//odometer
 			lreadingsRaw=new float[mostRecentLRngCells.length];
 			lrngCells=new float[mostRecentLRngCells.length];
-			System.arraycopy(mostRecentLRngCells, 0, lrngCells, 0, mostRecentLRngCells.length);		
+			System.arraycopy(mostRecentLRFRaw, 0, lreadingsRaw, 0, mostRecentLRFRaw.length);		
+			System.arraycopy(mostRecentLRngCells, 0, lrngCells, 0, mostRecentLRngCells.length);	
+			maxLen = mostRecentMaxLen;
 			lOdoCoordsRaw = new myPoint(odoCoordsRaw);
 			lOdoCells = new myPoint(odoCells);
 			lThetaOdo = thetaOdo;
@@ -68,43 +73,43 @@ public class myDataPoint {
 		float res = (Lab1Localization.invSqrt2Pi/sig_hit) * PApplet.exp(-.5f*(ztk*ztk)/(sig_hit*sig_hit));
 		return res;}
 	
-	public float getMaxLRFRange(){if(this.type!=1){return -1;}float res = 0;for(int i=0;i<lreadingsRaw.length;++i){res = PApplet.max(lreadingsRaw[i], res);}return res;}
+	//public float getMaxLRFRange(){if(this.type!=1){return -1;}float res = 0;for(int i=0;i<lreadingsRaw.length;++i){res = PApplet.max(lreadingsRaw[i], res);}return res;}
+	//get max value for lrf in cells distance from bot
+	public float getMaxLRFCells(){if(this.type!=1){return -1;}float res = 0;for(int i=0;i<lrngCells.length;++i){res = PApplet.max(lrngCells[i], res);}return res;}
 	
 	public void drawBotDataLoc(){
 		drawOdoLoc();
 		drawLRFbeams();		
 	}
-		
-	//draws the span of beams from a particular observation
-	public void drawLRFbeams(){
-		//if(this.type==0){return;}			//no beams from odo reading
-		p.pushMatrix();p.pushStyle();
+	
+	//translate and rotate in odometry frame
+	private void transRotOdo(){
 		p.translate(odoCells.x, odoCells.y,0);
 		p.rotate(lThetaOdo,0,0,p.rotZ);					//rotate to perceived orientation -- use -1 as axis for right handed
+	}
+	
+	//these are the observations as represented in the data file
+	//draws the span of beams from a particular observation
+	public void drawLRFbeams(){
+		p.pushMatrix();p.pushStyle();
+		transRotOdo();
 		p.translate(2.5f, 0,0);						//move to where laser range finder vals are
 		p.rotate(-PConstants.PI/2.0f,0,0,p.rotZ);			//reading spans
-		p.strokeWeight(1);
+		p.drawCastAra(lrngCells, 0, p.degPerC2Rad, p.degPerCasts);
 		//sweep is blue to red - only show 1 ray every deg per cast 
-		for(int i=0; i<this.lrngCells.length; i+=p.degPerCasts){
-			float mult = i/(1.0f*lrngCells.length);
-			p.stroke(255*mult,0,255-255*mult,255);			
-			p.line(0,0,0,lrngCells[i],0,0);
-			p.rotate(p.degPerC2Rad,0,0,p.rotZ);
-		}		
+
 		p.popStyle();p.popMatrix();		
 	}
 
 	//display robot on map 
 	public void drawOdoLoc(){
-		//int y=yb+306;
 		p.pushMatrix();p.pushStyle();
-		p.translate(odoCells.x, odoCells.y,0);
-			p.rotate(lThetaOdo,0,0,p.rotZ);
+			transRotOdo();
 			p.strokeWeight(.5f);
 			p.stroke(clr);
 			p.fill(clr);
-			p.box(2.5f, 2, 2);
-			p.strokeWeight(2);
+			p.box(2.5f, 2.0f, 2.0f);
+			p.strokeWeight(2.0f);
 			p.line(0, 0, 0, 50,0,0);
 		p.popStyle();p.popMatrix();
 	}	

@@ -33,7 +33,7 @@ public class Lab1Localization extends PApplet {
 	public String mapName = "wean.dat";
 	public myMap map;
 	// degrees between pre-calced ray casts, and radians equivalent
-	public final int degPerCasts = 5;
+	public final static int degPerCasts = 5;
 	public final float degPerC2Rad = degPerCasts * PConstants.DEG_TO_RAD;
 	public static int dp_incrID = 0;	
 	public int camInitialDist = -800;		//initial distance camera is from scene - needs to be negative
@@ -55,6 +55,11 @@ public class Lab1Localization extends PApplet {
 	public myVector focusTar;											//target of focus - used in translate to set where the camera is looking
 	
 	public myLocalizer[] MCL_locs;
+
+	public static void main(String[] args) {
+	    String[] appletArgs = new String[] { "cs8803Lab1.Lab1Localization" };
+	    if (args != null) {	    	PApplet.main(PApplet.concat(appletArgs, args));  } else {	    	PApplet.main(appletArgs);	    }
+	}//main
 	public void settings(){
 		size((int)(displayWidth*.95f), (int)(displayHeight*.9f),P3D);
 	}
@@ -85,10 +90,11 @@ public class Lab1Localization extends PApplet {
 	}
 	
 	public void draw3D(){
-		botIdx = drawCount%(this.dataLogs[0].data.length-1);
+		botIdx = drawCount%(this.dataLogs[logToSolve].data.length-1);
 		if(flags[runSim]){drawCount++;if(drawCount%scrMsgTime==0){if(consoleStrings.size() != 0){consoleStrings.pollFirst();}}}
 		pushMatrix();pushStyle();
 		drawSetup();																//initialize camera, lights and scene orientation and set up eye movement
+		//scale(1.0f,-1.0f,1.0f);//set with appropriate orientation
 		background(bground[0],bground[1],bground[2],bground[3]);	
 		translate(focusTar.x,focusTar.y,focusTar.z);				//center of screen
 		map.draw();
@@ -112,7 +118,7 @@ public class Lab1Localization extends PApplet {
 	//called once at start of program
 	public void initOnce(){
 		initVisOnce();
-		//flags[initialLoad]=true;				//set true upon initial load, to display data pertaining to program startup
+		flags[initialLoad]=true;				//set true upon initial load, to display data pertaining to program startup
 		//flags[runSim]=true;					//start with simulator running
 		map = new myMap(this, mapName);		//map from data
 		dataLogs = new myLogData[logNames.length];
@@ -207,7 +213,7 @@ public class Lab1Localization extends PApplet {
 	}// mousepressed	
 	
 	public void mouseDragged(){
-		if(mouseX<(width * menuWidthMult)){	//handle menu interaction
+		if(mouseX<(menuWidth)){//if(mouseX<(width * menuWidthMult)){	//handle menu interaction
 		}
 		else {
 			if(flags[shiftKeyPressed]){
@@ -260,7 +266,7 @@ public class Lab1Localization extends PApplet {
 			"Changing View",	
 			"Execute Simulation",
 			"Single step",
-			"Show DataPoints DB",
+			"Show DataPoints DBG",
 			"Show Precomputed Sample RCs",
 			"Sweep BRF Ray Lengths"
 			};
@@ -274,7 +280,7 @@ public class Lab1Localization extends PApplet {
 			"Changing View",	 	
 			"Execute Simulation",
 			"Single step",
-			"Show Samples DB",
+			"Show Samples DBG",
 			"Show Precomputed Sample RCs",
 			"Sweep BRF Ray Lengths"
 			};
@@ -613,6 +619,30 @@ public class Lab1Localization extends PApplet {
 	
 	public myVector normToPlane(myPoint A, myPoint B, myPoint C) {return myVector._cross(new myVector(A,B),new myVector(A,C)); };   // normal to triangle (A,B,C), not normalized (proportional to area)
 	public void circle(myPoint P, float r) {ellipse(P.x, P.y, 2*r, 2*r);}
+	
+	public void drawSphere(int[] fClr, boolean strk, float strkWt, int[] sClr, float rad){
+		pushStyle();
+		if(strk){
+			strokeWeight(strkWt);
+			stroke(sClr[0],sClr[1],sClr[2],255);
+		} else{		noStroke();	}
+		fill(fClr[0],fClr[1],fClr[2],255);
+		sphere(rad);		
+		popStyle();
+	}//drawSphere
+	public void drawCastAra(float[] castLengths, int gClr, float rotPerCasts, int castIncr){
+		pushStyle();
+		strokeWeight(1.0f);
+		float preCalc = 255.0f /(1.0f*castLengths.length);
+		for(int i =0; i<castLengths.length; i+=castIncr){
+			float mClr = preCalc * i;///(1.0f*castLengths.length);//i==0 ->cyan, i==castLengths.length -> yellow (ccw)
+			stroke(mClr,gClr,255-mClr,255);
+			line(0,0,0,castLengths[i],0,0);
+			rotate(rotPerCasts,0,0,rotZ);	
+		}
+		popStyle();
+	}
+	
 	public void line(myPoint p, myPoint q){line(p.x,p.y,p.z, q.x,q.y,q.z);}
 	public void show(myPoint P, float r, int clr) {pushMatrix(); pushStyle(); setColorValFill(clr); setColorValStroke(clr);sphereDetail(5);translate((float)P.x,(float)P.y,(float)P.z); sphere((float)r); popStyle(); popMatrix();} // render sphere of radius r and center P)
 	public void show(myPoint P, float r){show(P,r, gui_Black);}
